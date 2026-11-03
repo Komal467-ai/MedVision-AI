@@ -14,29 +14,78 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---------- CUSTOM CSS ----------
+# ---------- CUSTOM CSS (Modern Medical Dashboard) ----------
 st.markdown("""
 <style>
-    .stApp { background: #FFFFFF; }
-    h1 { color: #0066FF !important; font-weight: 700; letter-spacing: -1px; }
+    /* 1. Medical Background Image with soft gradient overlay */
+    .stApp {
+        background-image: 
+            linear-gradient(rgba(245, 250, 255, 0.92), rgba(255, 255, 255, 0.95)), 
+            url("https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=2000&auto=format&fit=crop");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }
+    
+    /* 2. Modern Gradient Text for Headers */
+    h1 { 
+        background: -webkit-linear-gradient(45deg, #004aad, #00b4d8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800 !important; 
+        letter-spacing: -1px;
+    }
+    h3 { 
+        color: #004aad !important; 
+        font-weight: 700 !important; 
+    }
+    
+    /* 3. Glassmorphism Cards (Transparent with blur) */
     .metric-card {
-        background: #F5F7FA; padding: 1.2rem; border-radius: 14px;
-        border: 1px solid #E1E5EB; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        padding: 1.5rem; border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.5);
+        border-left: 6px solid #00b4d8;
+        box-shadow: 0 8px 32px rgba(0, 74, 173, 0.1);
     }
+    
+    /* 4. Modern Medical Blue Buttons */
     .stButton>button {
-        background: linear-gradient(90deg, #0066FF, #00A3FF);
+        background: linear-gradient(90deg, #0077b6 0%, #00b4d8 100%);
         color: white; border: none; border-radius: 10px;
-        padding: 0.6rem 1.6rem; font-weight: 600; transition: 0.2s;
+        padding: 0.6rem 2rem; font-weight: 600; font-size: 1rem;
+        transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 119, 182, 0.3);
     }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,102,255,0.3); }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 119, 182, 0.5);
+    }
+    
+    /* 5. Teal Prediction Badge */
     .badge {
-        display:inline-block; padding: 4px 12px; border-radius: 20px;
-        background:#0066FF; color:#FFFFFF; font-weight:600; font-size:0.8rem;
+        display:inline-block; padding: 6px 16px; border-radius: 20px;
+        background: linear-gradient(90deg, #00b4d8 0%, #0077b6 100%);
+        color:#FFFFFF; font-weight:700; font-size:0.85rem;
+        box-shadow: 0 2px 10px rgba(0, 180, 216, 0.3);
     }
+    
+    /* 6. Alerts */
     .alert-box {
-        background: #FFF3F3; border-left: 4px solid #E53935;
-        padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-        color: #B71C1C;
+        background: rgba(255, 240, 240, 0.9);
+        border-left: 6px solid #ef233c;
+        padding: 1rem; border-radius: 10px; margin: 0.5rem 0;
+        color: #d80032; font-weight: 500;
+        box-shadow: 0 4px 12px rgba(239, 35, 60, 0.15);
+        backdrop-filter: blur(5px);
+    }
+    
+    /* 7. Sidebar Glass Effect */
+    [data-testid="stSidebar"] {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        border-right: 1px solid #e0e7ff;
+        box-shadow: 2px 0 15px rgba(0,0,0,0.03);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -107,7 +156,7 @@ with tab1:
                     cls = result["classification"]
                     st.markdown(
                         f'<div class="metric-card"><h4>Prediction</h4>'
-                        f'<h2 style="color:#0066FF;margin:0;">{cls["label"]}</h2>'
+                        f'<h2 style="color:#0077b6;margin:0;">{cls["label"]}</h2>'
                         f'<span class="badge">Confidence: {cls["confidence"]*100:.1f}%</span></div>',
                         unsafe_allow_html=True,
                     )
