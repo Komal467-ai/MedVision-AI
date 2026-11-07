@@ -1,0 +1,14 @@
+# Replace these example names with the exact classes in your labelled dataset.
+path: data/surgical_instruments
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: grasper
+  1: bipolar
+  2: hook
+  3: scissors
+  4: clipper
+  5: irrigator
+  6: specimen_bag
