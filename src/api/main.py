@@ -1,18 +1,18 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 import shutil
 
-# Import M4's surgical functions
+# Import M3 and M4 modules
 try:
-    from src.surgery.detector import SurgicalInstrumentDetector
+    from src.diagnosis.inference import predict_classification
     from src.surgery.tracker import SurgicalInstrumentTracker
-    from src.surgery.alerts import SurgicalSafetyMonitor
+    M3_AVAILABLE = True
     M4_AVAILABLE = True
 except ImportError:
+    M3_AVAILABLE = False
     M4_AVAILABLE = False
-    print("Warning: M4 surgery modules not found. Using mock data.")
 
 app = FastAPI(title="MediScan AI API", version="1.0")
 
@@ -30,59 +30,48 @@ def health_check():
 
 @app.post("/predict/diagnosis")
 async def predict_diagnosis(file: UploadFile = File(...)):
-    # TODO: M3 will replace this with real model calls
-    return {
-        "classification": {"label": "Pneumonia (Dummy)", "confidence": 0.93},
-        "segmentation": {"dice": 0.84, "mask_url": None},
-        "gradcam_url": None
-    }
+    if not M3_AVAILABLE:
+        raise HTTPException(status_code=500, detail="M3 Diagnosis code not found.")
+    
+    try:
+        contents = await file.read()
+        # Real M3 inference call
+        result = predict_classification(contents)
+        return result
+    except Exception as e:
+        # Ab koi dummy nahi, seedha error aayega
+        raise HTTPException(status_code=503, detail=f"M3 Model Error: {str(e)}")
 
 @app.post("/predict/surgery")
 async def predict_surgery(file: UploadFile = File(...)):
-    # Save the uploaded video temporarily
+    if not M4_AVAILABLE:
+        raise HTTPException(status_code=500, detail="M4 Surgery code not found.")
+
     temp_video_path = f"temp_{file.filename}"
     with open(temp_video_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Check if M4 model weights actually exist
     model_path = "models/best_yolo.pt"
     
-    if M4_AVAILABLE and os.path.exists(model_path):
-        try:
-            # REAL M4 INTEGRATION (Jab M2 model de dega tab yeh chalega)
-            tracker = SurgicalInstrumentTracker(model_path)
-            output_path = "results/tracking_temp.mp4"
-            
-            # Run tracking
-            records = tracker.track_video(temp_video_path, output_path)
-            
-            os.remove(temp_video_path) # Clean up
-            
-            return {
-                "status": "success",
-                "message": "Real M4 model executed.",
-                "tracking_video_url": output_path,
-                "phases": [{"name": "Real Phase 1", "start": 0, "end": 120}],
-                "alerts": []
-            }
-        except Exception as e:
-            os.remove(temp_video_path)
-            return {"error": f"Model failed to run: {str(e)}"}
-    
-    else:
-        # FALLBACK TO MOCK (Kyunki abhi models/best_yolo.pt nahi hai)
+    try:
+        if not os.path.exists(model_path):
+            raise FileNotFoundError("best_yolo.pt not found in models folder.")
+        
+        tracker = SurgicalInstrumentTracker(model_path)
+        output_path = "results/tracking_temp.mp4"
+        records = tracker.track_video(temp_video_path, output_path)
         os.remove(temp_video_path)
+        
         return {
-            "status": "mock",
-            "message": "M4 model weights not found yet. Returning mock data.",
-            "tracking_video_url": None,
-            "phases": [
-                {"name": "Preparation", "start": 0, "end": 120},
-                {"name": "Dissection", "start": 120, "end": 340},
-                {"name": "Suturing", "start": 340, "end": 600}
-            ],
-            "alerts": [{"type": "bleeding", "time": 145, "severity": "high", "msg": "Possible bleeding detected"}]
+            "status": "success",
+            "tracking_video_url": output_path,
+            "phases": [{"name": "Real Phase 1", "start": 0, "end": 120}],
+            "alerts": []
         }
+    except Exception as e:
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
+        raise HTTPException(status_code=503, detail=f"M4 Model Error: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
