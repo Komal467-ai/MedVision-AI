@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+<<<<<<< HEAD
 
 data/
 *.pth
@@ -9,3 +10,5 @@ archive.zip
 __pycache__/
 .ipynb_checkpoints/
 venv/
+=======
+>>>>>>> 8750f94f8c39810ff66a2182e3f4d5333b4d1311

@@ -1,9 +1,9 @@
+import sys
+import os
 import streamlit as st
 import requests
 import json
 from PIL import Image
-import sys
-import os
 
 # ---------- CONFIG ----------
 API_URL = "http://localhost:8000"
@@ -130,7 +130,7 @@ with tab1:
         uploaded = st.file_uploader("Upload a chest X-ray image", type=["png", "jpg", "jpeg"], key="diagnosis_upload")
         if uploaded:
             img = Image.open(uploaded).convert("RGB")
-            st.image(img, caption="Uploaded image", use_container_width=True)
+            st.image(img, caption="Uploaded image", use_column_width=True)
             run = st.button("Analyze X-Ray", key="run_diag")
         else:
             run = False
