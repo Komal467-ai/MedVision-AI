@@ -211,13 +211,36 @@ with tab2:
 # ================= TAB 3: REPORT =================
 with tab3:
     st.markdown("### Structured Report")
-    st.caption("Generates a JSON report combining diagnosis + surgery results.")
-    if st.button("Generate Sample Report"):
-        sample = {
-            "patient_id": "DEMO-001",
-            "diagnosis": {"label": "Pneumonia", "confidence": 0.93},
-            "surgery": {"phases": 3, "alerts": 1},
-            "generated_at": "2025-01-01T12:00:00Z",
+    st.caption("Generates a comprehensive JSON report combining diagnosis + surgery results.")
+    
+    if st.button("Generate Combined Report"):
+        # Combined Report Data
+        sample_report = {
+            "hospital_name": "MediScan AI Hospital",
+            "patient_id": "PAT-2026-001",
+            "date": "2026-11-09",
+            "diagnosis": {
+                "model": "EfficientNet-B0",
+                "result": "Pneumonia",
+                "confidence": "93.0%",
+                "gradcam_available": False
+            },
+            "surgery": {
+                "video_analyzed": "True",
+                "phases_detected": ["Preparation", "Dissection", "Suturing"],
+                "alerts_triggered": 1,
+                "alert_details": "Bleeding detected at 145s"
+            },
+            "status": "Mock Data (Awaiting M3/M4 Real Models)"
         }
-        st.code(json.dumps(sample, indent=2), language="json")
-        st.download_button("⬇️ Download JSON", data=json.dumps(sample, indent=2), file_name="report.json", mime="application/json")
+        
+        st.success("Report Generated Successfully!")
+        st.json(sample_report)
+        
+        # Download Button
+        st.download_button(
+            label="⬇️ Download JSON Report",
+            data=json.dumps(sample_report, indent=4),
+            file_name="medical_report.json",
+            mime="application/json"
+        )
