@@ -94,7 +94,7 @@ with st.sidebar:
     except Exception:
         api_ok = False
     st.markdown(f"{'🟢' if api_ok else '🔴'} FastAPI backend")
-    st.markdown("🟢 Model mode: LIVE (Real Models Only)")
+    st.markdown("🟢 Model mode: LIVE (Real Models)")
     st.caption("v1.0 · Drop 6")
 
 # ---------- HEADER ----------
@@ -140,7 +140,7 @@ if active == "Diagnosis":
     with col2:
         st.markdown("#### Results")
         if uploaded and run:
-            with st.spinner("Running Real Models (CNN + U-Net + Grad-CAM)..."):
+            with st.spinner("Running Real Model (CNN + Grad-CAM)..."):
                 files = {"file": (uploaded.name, uploaded.getvalue(), uploaded.type)}
                 try:
                     r = requests.post(f"{API_URL}/predict/diagnosis", files=files, timeout=60)
@@ -154,15 +154,23 @@ if active == "Diagnosis":
                     result = None
 
                 if result:
-                    cls = result.get("classification", {"label": "Unknown", "confidence": 0})
+                    # M3 ke actual response format ke hisaab se
+                    label = result.get("prediction", "Unknown")
+                    conf = result.get("confidence", 0.0)
+                    probs = result.get("probabilities", {})
+                    
                     st.markdown(
                         f'<div class="metric-card"><h4>Prediction</h4>'
-                        f'<h2 style="color:#0077b6;margin:0;">{cls["label"]}</h2>'
-                        f'<span class="badge">Confidence: {cls["confidence"]*100:.1f}%</span></div>',
+                        f'<h2 style="color:#0077b6;margin:0;">{label}</h2>'
+                        f'<span class="badge">Confidence: {conf*100:.1f}%</span></div>',
                         unsafe_allow_html=True,
                     )
-                    seg = result.get("segmentation", {"dice": 0})
-                    st.metric("Segmentation Dice", f'{seg["dice"]:.3f}')
+                    
+                    # Probabilities dikhao
+                    if probs:
+                        st.write("**Probabilities:**")
+                        for k, v in probs.items():
+                            st.write(f"- {k}: {v*100:.1f}%")
         else:
             st.caption("Upload an image and click **Analyze X-Ray**.")
 
@@ -214,7 +222,7 @@ elif active == "Report":
             "date": "2026-11-09",
             "diagnosis": {
                 "model": "EfficientNet-B0",
-                "result": "Awaiting Real Model",
+                "result": "Awaiting Live Test",
                 "confidence": "0%",
                 "gradcam_available": False
             },
@@ -222,9 +230,9 @@ elif active == "Report":
                 "video_analyzed": "True",
                 "phases_detected": [],
                 "alerts_triggered": 0,
-                "alert_details": "Awaiting Real Model"
+                "alert_details": "Awaiting Live Test"
             },
-            "status": "Live System (Real Models Pending)"
+            "status": "Live System (Real Models)"
         }
         
         st.success("Report Generated Successfully!")
