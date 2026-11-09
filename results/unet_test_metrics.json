@@ -1,0 +1,9 @@
+{
+  "dice_mean": 0.8214,
+  "iou_mean": 0.7915,
+  "dice_tumour_slices": 0.59,
+  "dice_global": 0.6833,
+  "iou_global": 0.519,
+  "n_images": 600,
+  "loss": 0.12
+}

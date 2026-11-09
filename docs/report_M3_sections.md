@@ -1,7 +1,7 @@
 # Report — M3 sections (Diagnosis): Section 2 Related Work · Section 3 Methodology
 
 > Written by M3 (ML Engineer — Diagnosis) for `docs/report.pdf` (compiled by M1).
-> Items in **[square brackets]** are filled from the Kaggle run (`results/*.json`) — do not invent numbers.
+> All numbers below come from the Kaggle training run of 9 Nov 2026 (`results/*.json`, notebook *M3 Diagnosis Training - EfficientNet U-Net*, GPU T4).
 > A Section 4 (Results — diagnosis) template is included at the end so M1 can drop it in next to M4's surgery results.
 
 ---
@@ -34,8 +34,8 @@ Most published systems treat diagnosis models in isolation. Our contribution is 
 | Task | Dataset | Size | Labels |
 |---|---|---|---|
 | Classification | Chest X-Ray Images (Pneumonia), Kermany et al. 2018 (Kaggle) | 5,863 JPEG images, paediatric, anterior-posterior | NORMAL / PNEUMONIA (≈ 1 : 2.9) |
-| Segmentation (primary) | BraTS slices prepared by M2 | [n slices / n patients] | binary whole-tumour mask |
-| Segmentation (backup) | LGG MRI Segmentation, Buda et al. 2019 (Kaggle) | 3,929 FLAIR slices, 110 patients | binary tumour mask |
+| Segmentation (planned) | BraTS slices prepared by M2 | not yet available — the reported run uses the LGG backup | binary whole-tumour mask |
+| Segmentation (used) | LGG MRI Segmentation, Buda et al. 2019 (Kaggle) | 3,929 FLAIR slices, 110 patients | binary tumour mask |
 
 ### 3.2 Pre-processing
 1. **Grayscale loading and CLAHE** (clip limit 2.0, 8×8 tiles) to equalise local contrast in radiographs — identical to M2's `image_preprocess.py` and re-applied at inference so training and deployment see the same input distribution.
@@ -44,7 +44,7 @@ Most published systems treat diagnosis models in isolation. Our contribution is 
 4. **Normalisation** with ImageNet mean (0.485, 0.456, 0.406) and std (0.229, 0.224, 0.225).
 
 ### 3.3 Patient-level data split
-The official Kaggle split has a 16-image validation folder, which is too small to select models. All images were pooled and re-split **70 / 15 / 15 by patient**: the patient identifier is parsed from the file name (e.g. `person1_bacteria_1.jpeg` → `person1`, `IM-0115-0001.jpeg` → `IM-0115`), patients are shuffled with a fixed seed separately per class (stratification), and every image of a patient goes to the same split. An automatic check (`assert_no_patient_leak`) fails the run if any patient appears in two splits. Final counts: **[train / val / test images and patients]**. The same procedure (by case / patient folder) is used for segmentation.
+The official Kaggle split has a 16-image validation folder, which is too small to select models. All images were pooled and re-split **70 / 15 / 15 by patient**: the patient identifier is parsed from the file name (e.g. `person1_bacteria_1.jpeg` → `person1`, `IM-0115-0001.jpeg` → `IM-0115`), patients are shuffled with a fixed seed separately per class (stratification), and every image of a patient goes to the same split. An automatic check (`assert_no_patient_leak`) fails the run if any patient appears in two splits. Final counts — classification: train 4,077 images (1,108 NORMAL / 2,969 PNEUMONIA), validation 893 (237 / 656), test 886 (238 / 648); segmentation (LGG): train 2,714 slices / 77 patients, validation 615 / 16, test 600 / 17. The same procedure (by case / patient folder) is used for segmentation.
 
 ### 3.4 Data augmentation (training only, Albumentations)
 | Classifier | U-Net (applied jointly to image and mask) |
@@ -62,7 +62,7 @@ Horizontal flips are deliberately **not** used for chest X-rays because they cre
 * **Loss:** class-weighted cross-entropy, with inverse-frequency weights computed on the training split,
   w_c = N / (2 · N_c), to counter the ≈ 3 : 1 PNEUMONIA : NORMAL imbalance.
 * **Optimiser:** AdamW (lr 3×10⁻⁴, weight decay 10⁻⁴) with a one-cycle schedule (15 % warm-up, cosine decay).
-* **Training:** 5 epochs, batch 32, mixed precision (FP16) on a Kaggle [T4/P100] GPU, seed 42.
+* **Training:** 5 epochs, batch 32, mixed precision (FP16) on a Kaggle Tesla T4 GPU (~48 s per epoch), seed 42.
 * **Model selection:** checkpoint with the highest **validation AUROC** (threshold-independent, stable on small validation sets) is saved as `best_cnn.pth`.
 * **Decision threshold:** 0.5 by default; optionally the threshold maximising Youden's J (sensitivity + specificity − 1) on the **validation** set. The test set is never used for any choice.
 
@@ -103,24 +103,40 @@ For phase recognition, `src/shared/cnn_features.py` converts each surgical video
 
 ---
 
-## 4. Results — diagnosis (template for the Results section)
+## 4. Results — diagnosis
 
-**Table 4.x — Pneumonia classification, held-out test patients (n = [ ])**
-| Model | Accuracy | Precision | Recall | Specificity | F1 | AUROC |
+### 4.1 Pneumonia classification
+**Table 4.1 — EfficientNet-B0, held-out test patients (n = 886 images: 238 NORMAL, 648 PNEUMONIA)**
+| Decision threshold | Accuracy | Precision | Recall (sensitivity) | Specificity | F1 | AUROC |
 |---|---|---|---|---|---|---|
-| EfficientNet-B0 (thr 0.5) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| EfficientNet-B0 (val-tuned thr = [ ]) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 0.50 (default) | 0.9639 | 0.9858 | 0.9645 | 0.9622 | 0.9750 | 0.9953 |
+| 0.404 (tuned on validation, Youden J) | **0.9695** | 0.9859 | **0.9722** | 0.9622 | **0.9790** | 0.9953 |
 
-Figures: `training_curves.png`, `confusion_matrix.png`, `roc_curve.png`, `gradcam_samples.png`.
+Confusion matrix at the tuned threshold: 229 NORMAL correct, 9 NORMAL flagged as pneumonia (false positives), 18 pneumonia missed (false negatives), 630 pneumonia correct. Tuning the threshold on the validation set — never on test — cut missed pneumonias from 23 to 18 without adding any false alarms.
 
-**Table 4.y — Tumour segmentation, held-out test patients (n = [ ] slices)**
-| Model | Dice (all slices) | Dice (tumour slices) | IoU | Global Dice |
-|---|---|---|---|---|
-| U-Net (32 base, Dice+BCE) | [ ] | [ ] | [ ] | [ ] |
+Training converged quickly (`training_curves.png`): validation accuracy rose from 0.907 after epoch 1 to 0.977 after epoch 5 and validation AUROC stayed above 0.99 from the first epoch; validation loss stayed below training loss (training-time augmentation and dropout), so there is no sign of over-fitting within 5 epochs.
 
-Figures: `unet_training_curves.png`, `segmentation_overlay.png`.
+**Grad-CAM (`gradcam_samples.png`).** For the NORMAL example the map concentrates on the central chest/heart region; for the PNEUMONIA example (95.5 % confidence) it highlights both mid-lung zones, consistent with the opacity pattern. The pneumonia map also places some weight on the upper-right image corner (shoulder / outside the lung field). This is exactly the kind of potential shortcut Zech et al. (2018) warned about, and it is reported as a limitation: high test accuracy on a single-centre dataset does not prove the model relies only on lung pathology.
 
-Targets set in the plan: accuracy ≥ 0.85, Dice ≥ 0.80 → **[met / not met]**.
+### 4.2 Tumour segmentation
+**Table 4.2 — U-Net, held-out test patients (LGG MRI, 600 slices from 17 patients)**
+| Metric | Value |
+|---|---|
+| Dice, mean per slice (all slices) | **0.821** |
+| IoU, mean per slice (all slices) | 0.792 |
+| Dice, mean over tumour-containing slices only | 0.590 |
+| Global Dice (all test pixels pooled) | 0.683 |
+| Global IoU | 0.519 |
+
+The best checkpoint (validation Dice 0.774) was reached at epoch 21 of 25 (`unet_training_curves.png`).
+
+**Interpreting the Dice figures honestly.** The plan's target (Dice ≥ 0.80) is met by the standard per-slice mean, but most LGG slices contain no tumour, and a correct "no tumour" prediction scores 1. On slices that do contain tumour, mean Dice is 0.59. The overlay figure (`segmentation_overlay.png`) shows why: large lesions are segmented well (Dice 0.86 and 0.91 in the examples), whereas small lesions are sometimes missed entirely (Dice 0 in two examples). Improving small-lesion recall — e.g. training more epochs, oversampling tumour slices (`--only_positive_train`), a higher Dice weight, or a pretrained encoder — is the main next step.
+
+### 4.3 Targets
+| Target (from the work plan) | Result | Status |
+|---|---|---|
+| Classifier accuracy ≥ 0.85 | 0.9695 | ✅ met |
+| U-Net Dice ≥ 0.80 | 0.821 (per-slice mean); 0.590 on tumour slices | ✅ met on the planned metric, with the caveat above |
 
 ---
 

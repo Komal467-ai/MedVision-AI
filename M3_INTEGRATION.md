@@ -22,8 +22,9 @@ Everything M3 owns in the 8-drop plan, in the team repo layout. Copy these folde
 | 7 | API inference functions | `src/diagnosis/inference.py` | ✅ |
 | 8 | Report §2 + §3 (diagnosis) | `docs/report_M3_sections.md` | ✅ draft, results to fill |
 | 8 | Viva prep | `docs/viva_M3.md` | ✅ |
-| — | `best_cnn.pth` (≥ 85 % acc), `best_unet.pth` (Dice ≥ 0.80) | `models/` | ⏳ produced by running the notebooks on Kaggle GPU |
-| — | `results/*.png` | `results/` | ⏳ produced by the notebooks |
+| — | `best_cnn.pth` — **test accuracy 0.9695**, AUROC 0.995 (target ≥ 0.85) | Drive (M2), not in git | ✅ trained on Kaggle T4, 9 Nov 2026 |
+| — | `best_unet.pth` — **test Dice 0.821** (target ≥ 0.80; 0.59 on tumour slices) | Drive (M2), not in git | ✅ trained on Kaggle T4 (LGG MRI) |
+| — | `results/*.png`, `*_metrics.json`, training histories | `results/`, `models/*.json` | ✅ committed |
 
 ## Run order on Kaggle (GPU on)
 ```bash
