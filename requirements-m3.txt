@@ -1,9 +1,0 @@
-torch>=2.1
-torchvision>=0.16
-albumentations>=1.4
-opencv-python-headless
-scikit-learn
-pandas
-numpy
-matplotlib
-pytest
