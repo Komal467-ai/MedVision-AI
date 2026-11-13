@@ -1,0 +1,5 @@
+models/*.pth
+runs/
+__pycache__/
+.pytest_cache/
+*.zip

@@ -1,81 +1,33 @@
-# M3 — ML Engineer (Diagnosis): handover
+# M3 — Diagnosis (chest X-ray): handover
 
-Everything M3 owns in the 8-drop plan, in the team repo layout. Copy these folders into `medical-ai/` on a branch (e.g. `m3/diagnosis`) and open PRs per drop for M1 to review.
+M3's module now lives in **`m3_cxr4/`**. It is self-contained (its own `src/`, `tests/` and `requirements.txt`), so it doesn't touch the API, dashboard or M4 code.
+It replaces the earlier 2-class pneumonia CNN + U-Net version.
 
-## Deliverables checklist
-| Drop | Deliverable | File | Status |
-|---|---|---|---|
-| 2 | PyTorch Dataset + DataLoader (patient-level split, leak check) | `src/data/dataset.py` | ✅ code + tests |
-| 2 | Albumentations transforms | `src/preprocessing/augment.py` | ✅ code + tests |
-| 2 | Unit tests | `tests/test_preprocessing.py` (+ `tests/test_diagnosis_models.py`) | ✅ passing |
-| 3 | EfficientNet-B0 classifier | `src/diagnosis/classifier.py` | ✅ |
-| 3 | Training loop (5 ep, AdamW, CE) | `src/diagnosis/train_classifier.py` | ✅ |
-| 3 | Metrics + confusion matrix + ROC | `src/diagnosis/evaluate.py` | ✅ |
-| 3 | Grad-CAM (2 samples) | `src/diagnosis/gradcam.py` | ✅ |
-| 3 | Notebook | `notebooks/02_cnn_training.ipynb` | ✅ Kaggle-ready |
-| 4 | U-Net with skip connections | `src/diagnosis/unet.py` | ✅ |
-| 4 | Dice + BCE loss, Dice/IoU metrics | `src/diagnosis/losses.py` | ✅ |
-| 4 | Training loop | `src/diagnosis/train_unet.py` | ✅ |
-| 4 | Test Dice/IoU + overlays | `src/diagnosis/evaluate_unet.py` | ✅ |
-| 4 | Notebook | `notebooks/03_unet_training.ipynb` | ✅ Kaggle-ready |
-| 5–6 | CNN features + LSTM for M4 | `src/shared/cnn_features.py`, `src/shared/phase_lstm.py` | ✅ |
-| 7 | API inference functions | `src/diagnosis/inference.py` | ✅ |
-| 8 | Report §2 + §3 (diagnosis) | `docs/report_M3_sections.md` | ✅ draft, results to fill |
-| 8 | Viva prep | `docs/viva_M3.md` | ✅ |
-| — | `best_cnn.pth` — **test accuracy 0.9695**, AUROC 0.995 (target ≥ 0.85) | Drive (M2), not in git | ✅ trained on Kaggle T4, 9 Nov 2026 |
-| — | `best_unet.pth` — **test Dice 0.821** (target ≥ 0.80; 0.59 on tumour slices) | Drive (M2), not in git | ✅ trained on Kaggle T4 (LGG MRI) |
-| — | `results/*.png`, `*_metrics.json`, training histories | `results/`, `models/*.json` | ✅ committed |
+**Task:** 4-class chest X-ray diagnosis: COVID-19, Lung Opacity, Normal, Viral Pneumonia
+**Data:** COVID-19 Radiography Database (Kaggle `tawsifurrahman/covid19-radiography-database`), 21,165 images with lung masks, split 70/15/15 with near-duplicates kept in the same split
+**Models:** ResNet-50, DenseNet-121, EfficientNet-B0, ConvNeXt-Tiny, ViT-B/16, Swin-T (ImageNet-pretrained), plus soft-voting ensembles, 3 seeds each
+**Checks:** Grad-CAM lung-focus audit, leakage test, shortcut test with masked lungs, calibration, ablations
 
-## Run order on Kaggle (GPU on)
+## Run
 ```bash
-# classification  (~30 min)
-python -m src.diagnosis.train_classifier --data_root <.../chest_xray> --epochs 5
-python -m src.diagnosis.evaluate        --ckpt models/best_cnn.pth --data_root <...> --tune_threshold
-python -m src.diagnosis.gradcam         --ckpt models/best_cnn.pth --data_root <...>
-# segmentation    (~20–30 min)
-python -m src.diagnosis.train_unet      --img_dir <images> --mask_dir <masks> --epochs 25
-python -m src.diagnosis.evaluate_unet   --ckpt models/best_unet.pth --img_dir <images> --mask_dir <masks>
+cd m3_cxr4
+pip install -r requirements.txt
+pytest -q                                   # 20 offline tests
+python -m src.run_study --stage smoke       # every step on a few batches (GPU)
 ```
-Use the same `--seed` (default 42) for train and evaluate so the test patients are identical.
-With M2's split CSV use `--csv data/splits/cxr_split.csv` (columns `path,label,patient_id,split`).
+Full study: `m3_cxr4/notebooks/kaggle_run_study.ipynb` on Kaggle (T4 GPU), run once per stage: main → audits → analysis.
 
-## Contract for M5 (FastAPI) — Drop 5/7
+## For M5 (API)
 ```python
-from src.diagnosis.inference import predict_classification, predict_segmentation, ModelNotAvailable, models_status
+from m3_cxr4.m3_service import predict_xray, ModelNotAvailable, models_status   # avoids the clash between the two `src` packages
 
 @app.post("/predict/diagnosis")
-async def diagnosis(file: UploadFile = File(...)):
+async def predict_diagnosis(file: UploadFile = File(...)):
     try:
-        return predict_classification(await file.read())       # bytes, path or RGB array all work
-    except ModelNotAvailable as e: raise HTTPException(503, str(e))
-    except ValueError as e:        raise HTTPException(400, str(e))
-
-@app.post("/predict/segmentation")
-async def segmentation(file: UploadFile = File(...)):
-    ...predict_segmentation(await file.read())...
+        return predict_xray(await file.read())   # prediction, confidence, probabilities (4 classes), gradcam_png_base64
+    except ModelNotAvailable as e:
+        raise HTTPException(503, str(e))
 ```
-`predict_classification` → `{task, model, prediction, confidence, probabilities{NORMAL,PNEUMONIA}, threshold, gradcam_png_base64, inference_ms, disclaimer}`
-`predict_segmentation` → `{task, model, tumour_detected, tumour_area_percent, tumour_pixels, n_regions, bbox, mean_confidence_in_mask, mask_png_base64, overlay_png_base64, image_size, inference_ms, disclaimer}`
-Streamlit: `st.image(base64.b64decode(r["gradcam_png_base64"]))`.
+Put the trained `best.pth` file(s) in `m3_cxr4/models/`. They're shared on Drive, not in git; with several files, predictions use their average (ensemble).
 
-## Docker notes (M1/M5)
-* Mount weights: `volumes: ["./models:/app/models"]`, env `MODEL_DIR=/app/models` (optional `DEVICE=cpu`).
-* No internet needed at runtime — networks are built with `pretrained=False` before loading checkpoints.
-* Use `opencv-python-headless` in the image (no GUI libs).
-* Weights are **not** committed to git — M2 keeps them on Drive (Drop 6).
-
-## requirements.txt additions (M1)
-```
-torch>=2.1
-torchvision>=0.16
-albumentations>=1.4
-opencv-python-headless
-scikit-learn
-pandas
-numpy
-matplotlib
-pytest
-```
-
-## Tests
-`pytest -q tests/` — fully offline, CPU, synthetic data (builds a fake Kaggle-style folder tree and fake MRI slices).
+Research prototype — not a medical device.
